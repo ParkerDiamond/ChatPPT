@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.chatppt/
+presentations/
+tmp_test_workspace/
+tmp_smoke_test/
+*.tgz
+*.tmp
+*.log
+.DS_Store
