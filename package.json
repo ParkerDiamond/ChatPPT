@@ -4,7 +4,7 @@
   "description": "Model Context Protocol (MCP) server for programmatic PowerPoint creation and editing",
   "publisher": "JParkerDiamond",
   "author": "J. Parker Diamond",
-  "mcpName": "io.github.parkerdiamond/chatppt",
+  "mcpName": "io.github.ParkerDiamond/chatppt",
   "license": "MIT",
   "type": "module",
   "repository": {
