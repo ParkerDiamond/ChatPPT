@@ -30,6 +30,7 @@ import { NotFoundError, ValidationError } from "./errors.js";
 import { validateGeometry } from "./invariants.js";
 import { ensureSubpath, getRegistryStore, getWorkspaceRoot } from "../storage/registry.js";
 import { presentationStore } from "../storage/presentationStore.js";
+import { deckMutex } from "../storage/deckMutex.js";
 
 const now = () => new Date().toISOString();
 
@@ -76,6 +77,17 @@ export type ElementUpdateParams = {
 
 export class ElementService {
   async create(args: {
+    deckId: string;
+    slideId: string;
+    elements: ElementCreateParams[];
+  }): Promise<{ created: Array<{ clientId?: string; element: ElementRecord }> }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._createWithLock(args);
+    });
+  }
+
+  private async _createWithLock(args: {
     deckId: string;
     slideId: string;
     elements: ElementCreateParams[];
@@ -284,6 +296,17 @@ export class ElementService {
     slideId: string;
     updates: ElementUpdateParams[];
   }): Promise<{ updated: ElementRecord[] }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._updateWithLock(args);
+    });
+  }
+
+  private async _updateWithLock(args: {
+    deckId: string;
+    slideId: string;
+    updates: ElementUpdateParams[];
+  }): Promise<{ updated: ElementRecord[] }> {
     if (!args.updates || args.updates.length === 0) {
       throw new ValidationError("At least one element update must be provided");
     }
@@ -416,6 +439,17 @@ export class ElementService {
   }
 
   async delete(args: {
+    deckId: string;
+    slideId: string;
+    elementIds: string[];
+  }): Promise<{ deleted: ElementRecord[] }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._deleteWithLock(args);
+    });
+  }
+
+  private async _deleteWithLock(args: {
     deckId: string;
     slideId: string;
     elementIds: string[];

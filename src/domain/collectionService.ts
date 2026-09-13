@@ -2,11 +2,24 @@ import { randomUUID } from "node:crypto";
 import type { SlideCollection } from "./models.js";
 import { NotFoundError, ValidationError } from "./errors.js";
 import { getRegistryStore } from "../storage/registry.js";
+import { deckMutex } from "../storage/deckMutex.js";
 
 const now = () => new Date().toISOString();
 
 export class CollectionService {
   async create(args: {
+    deckId: string;
+    name: string;
+    description?: string;
+    slideIds?: string[];
+  }): Promise<SlideCollection> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._createWithLock(args);
+    });
+  }
+
+  private async _createWithLock(args: {
     deckId: string;
     name: string;
     description?: string;
@@ -68,6 +81,19 @@ export class CollectionService {
     description?: string;
     slideIds?: string[];
   }): Promise<SlideCollection> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._updateWithLock(args);
+    });
+  }
+
+  private async _updateWithLock(args: {
+    deckId: string;
+    slideCollectionId: string;
+    name?: string;
+    description?: string;
+    slideIds?: string[];
+  }): Promise<SlideCollection> {
     const registryStore = getRegistryStore();
     const registry = await registryStore.read();
     const deck = registry.decks.find((d) => d.id === args.deckId);
@@ -100,6 +126,13 @@ export class CollectionService {
   }
 
   async delete(deckId: string, slideCollectionId: string): Promise<SlideCollection> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(deckId, async () => {
+      return await this._deleteWithLock(deckId, slideCollectionId);
+    });
+  }
+
+  private async _deleteWithLock(deckId: string, slideCollectionId: string): Promise<SlideCollection> {
     const registryStore = getRegistryStore();
     const registry = await registryStore.read();
     const deck = registry.decks.find((d) => d.id === deckId);

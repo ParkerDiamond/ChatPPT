@@ -11,6 +11,7 @@
   - Presentation files are stored under `presentations/<deckId>.pptx`.
   - Server metadata, slide collections, and element mapping are tracked in `.chatppt/registry.json`.
 - **Atomic Operations & Consistency**: All file writes use temporary files and atomic renames to prevent partial file corruption.
+- **Visual Slide Previews**: Render any slide to a PNG image for agent visual feedback using `@office-kit/pptx-preview`.
 - **Vectorized / Batch Operations**: Create, update, or delete multiple slides or elements in a single tool call to optimize LLM interactions.
 - **Rich Elements**: Create and update text boxes, preset shapes (180+ DrawingML geometries), lines, tables, charts (column, bar, line, pie, doughnut, area), and images.
 - **Full Typography & Styling**: Custom fonts, font sizes, bold, italic, text colors, fills, borders/strokes, alignment, and z-index ordering.
@@ -45,7 +46,7 @@ When running via `npx` or published binary, ChatPPT can be configured to target 
     "chatppt": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "chatppt", "--workspace", "${workspaceFolder}"]
+      "args": ["-y", "@parkerdiamond/chatppt", "--workspace", "${workspaceFolder}"]
     }
   }
 }
@@ -91,6 +92,7 @@ ChatPPT operates on a deterministic workspace root resolved in the following pri
 - `slide_create`: Add one or multiple slides in batch (supports `title` and `notes`).
 - `slide_list`: List slides in presentation order with 0-based `position` indexes.
 - `slide_read`: Read slide metadata and its element listing.
+- `slide_render`: Render a slide to a PNG image preview for visual feedback. Accepts an optional `width` in pixels, defaulting to `1280`, and returns an MCP `image` content item.
 - `slide_update`: Update slide title and speaker notes in batch.
 - `slide_delete`: Permanently delete slides and clean up collection references.
 - `slide_move`: Move a slide or reorder slides by providing a `slideOrder` array.
@@ -110,6 +112,20 @@ ChatPPT operates on a deterministic workspace root resolved in the following pri
 - `element_update`: Update position, size, text, fill, font, size, bold, italic, text color, stroke, and alignment in batch.
 - `element_delete`: Delete elements from a slide in batch.
 - `element_reorder`: Adjust element z-index (`bringToFront`, `sendToBack`, `bringForward`, `sendBackward`).
+
+### Rendering a Slide Preview
+
+Call `slide_render` with the deck and slide UUIDs. The response includes a base64-encoded `image/png` content item that MCP clients can display directly:
+
+```json
+{
+  "deckId": "<deck UUID>",
+  "slideId": "<slide UUID>",
+  "width": 1280
+}
+```
+
+The renderer is a deterministic approximation of PowerPoint output and runs in Node.js without a headless browser.
 
 ---
 

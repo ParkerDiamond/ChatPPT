@@ -1,14 +1,15 @@
 import { execSync as exec } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { mkdtemp, mkdir, rm, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
-const SMOKE_ROOT = resolve(process.cwd(), "tmp_smoke_test");
-const TARBALL_DIR = join(SMOKE_ROOT, "pack");
-const INSTALL_DIR = join(SMOKE_ROOT, "install");
-const WORKSPACE_DIR = join(SMOKE_ROOT, "workspace");
+let smokeRoot = "";
+let tarballDir = "";
+let installDir = "";
+let workspaceDir = "";
 
 describe("Package Smoke Test (Built Tarball Artifact)", () => {
   let client: Client;
@@ -16,31 +17,35 @@ describe("Package Smoke Test (Built Tarball Artifact)", () => {
   let tarballFilename: string;
 
   beforeAll(async () => {
-    // 1. Clean up & create smoke test directories
-    await rm(SMOKE_ROOT, { recursive: true, force: true });
-    await mkdir(TARBALL_DIR, { recursive: true });
-    await mkdir(INSTALL_DIR, { recursive: true });
-    await mkdir(WORKSPACE_DIR, { recursive: true });
+    smokeRoot = await mkdtemp(join(tmpdir(), "chatppt-smoke-"));
+    tarballDir = join(smokeRoot, "pack");
+    installDir = join(smokeRoot, "install");
+    workspaceDir = join(smokeRoot, "workspace");
+    await mkdir(tarballDir, { recursive: true });
+    await mkdir(installDir, { recursive: true });
+    await mkdir(workspaceDir, { recursive: true });
 
     // 2. Build TypeScript project
     exec("npm run build", { cwd: process.cwd(), stdio: "pipe" });
 
     // 3. Pack tarball into TARBALL_DIR
-    const packOutput = exec(`npm pack --pack-destination="${TARBALL_DIR}"`, {
+    const packOutput = exec(`npm pack --pack-destination="${tarballDir}"`, {
       cwd: process.cwd(),
       encoding: "utf8",
     });
     tarballFilename = packOutput.trim().split("\n").pop()!;
 
-    // 4. Extract tarball into INSTALL_DIR
-    const tarballPath = join(TARBALL_DIR, tarballFilename);
-    exec(`tar -xzf "${tarballPath}" -C "${INSTALL_DIR}"`, { stdio: "pipe" });
+    // 4. Install the packed artifact outside this repository.
+    const tarballPath = join(tarballDir, tarballFilename);
+    exec("npm init -y", { cwd: installDir, stdio: "pipe" });
+    exec(`npm install "${tarballPath}" --ignore-scripts`, { cwd: installDir, stdio: "pipe" });
 
-    // 5. Connect Client via StdioClientTransport to extracted package binary
-    const entrypoint = join(INSTALL_DIR, "package", "dist", "index.js");
+    // 5. Connect Client via StdioClientTransport to the installed package binary.
+    const pkgJson = JSON.parse(await import("node:fs/promises").then(fs => fs.readFile(join(process.cwd(), "package.json"), "utf8")));
+    const entrypoint = join(installDir, "node_modules", ...pkgJson.name.split("/"), "dist", "index.js");
     transport = new StdioClientTransport({
       command: "node",
-      args: [entrypoint, "--workspace", WORKSPACE_DIR],
+      args: [entrypoint, "--workspace", workspaceDir],
     });
 
     client = new Client({ name: "smoke-test-client", version: "1.0.0" });
@@ -51,7 +56,19 @@ describe("Package Smoke Test (Built Tarball Artifact)", () => {
     if (transport) {
       await transport.close().catch(() => {});
     }
-    await rm(SMOKE_ROOT, { recursive: true, force: true }).catch(() => {});
+    if (smokeRoot) {
+      await rm(smokeRoot, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("should ensure version and identifier consistency across package.json and server.json", async () => {
+    const pkgJson = JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8"));
+    const serverJson = JSON.parse(await readFile(join(process.cwd(), "server.json"), "utf8"));
+
+    expect(serverJson.version).toBe(pkgJson.version);
+    expect(serverJson.name).toBe(pkgJson.mcpName);
+    expect(serverJson.packages[0].identifier).toBe(pkgJson.name);
+    expect(serverJson.packages[0].version).toBe(pkgJson.version);
   });
 
   it("should discover all expected MCP tools from the built package", async () => {
@@ -68,6 +85,7 @@ describe("Package Smoke Test (Built Tarball Artifact)", () => {
     expect(toolNames).toContain("slide_create");
     expect(toolNames).toContain("slide_list");
     expect(toolNames).toContain("slide_read");
+    expect(toolNames).toContain("slide_render");
     expect(toolNames).toContain("slide_update");
     expect(toolNames).toContain("slide_delete");
     expect(toolNames).toContain("slide_move");
@@ -137,7 +155,16 @@ describe("Package Smoke Test (Built Tarball Artifact)", () => {
     };
     expect(elemData.created[0]!.clientId).toBe("txt-1");
 
-    // 4. Validate deck
+    // 4. Render the slide and verify the MCP image content block.
+    const renderRes = (await client.callTool({
+      name: "slide_render",
+      arguments: { deckId, slideId, width: 640 },
+    })) as { content: Array<{ type: string; data?: string; mimeType?: string }> };
+    expect(renderRes.content[0]!.type).toBe("image");
+    expect(renderRes.content[0]!.mimeType).toBe("image/png");
+    expect(renderRes.content[0]!.data).toBeTruthy();
+
+    // 5. Validate deck
     const validateRes = (await client.callTool({
       name: "deck_validate",
       arguments: { deckId },

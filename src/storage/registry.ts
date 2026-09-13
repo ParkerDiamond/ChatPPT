@@ -1,9 +1,43 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { randomBytes } from "node:crypto";
 import type { Registry } from "../domain/models.js";
 import { ValidationError } from "../domain/errors.js";
 
 const emptyRegistry = (): Registry => ({ decks: [] });
+
+/**
+ * Generate a unique temporary filename using a random suffix.
+ * Prevents race conditions when multiple processes write simultaneously.
+ */
+function generateUniqueTempPath(originalPath: string): string {
+  const randomSuffix = randomBytes(8).toString("hex");
+  return `${originalPath}.tmp.${randomSuffix}`;
+}
+
+/**
+ * Safely remove a temporary file, ignoring errors if it doesn't exist.
+ */
+async function safeDeleteTemp(path: string): Promise<void> {
+  try {
+    await rm(path, { force: true });
+  } catch {
+    // Temp file may not exist or already cleaned up; this is acceptable
+  }
+}
+
+/**
+ * Verify that a file exists and is readable.
+ * Used to confirm atomicity of writes.
+ */
+async function verifyFileExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export class RegistryStore {
   constructor(private readonly filePath: string) {}
@@ -27,11 +61,48 @@ export class RegistryStore {
     }
   }
 
+  /**
+   * Atomically write the registry with crash-safe semantics.
+   * 
+   * 1. Write to a unique temp file
+   * 2. Atomically rename to final path
+   * 3. Verify the file exists at the target path
+   * 4. Clean up temp file on failure
+   * 
+   * Throws if the write fails or verification fails.
+   */
   async write(registry: Registry): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const temporaryPath = `${this.filePath}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
-    await rename(temporaryPath, this.filePath);
+
+    const temporaryPath = generateUniqueTempPath(this.filePath);
+    let renameSucceeded = false;
+
+    try {
+      // Write to unique temp file
+      await writeFile(temporaryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+      // Atomically rename temp to final
+      await rename(temporaryPath, this.filePath);
+      renameSucceeded = true;
+
+      // Verify the file exists at the final path
+      const verified = await verifyFileExists(this.filePath);
+      if (!verified) {
+        throw new Error(`Verification failed: registry not found at ${this.filePath} after rename`);
+      }
+    } catch (error) {
+      // Clean up temp file on any failure
+      await safeDeleteTemp(temporaryPath);
+
+      // If rename succeeded but verification failed, the file might be corrupted
+      // In this case, do NOT delete the final file; preserve last known good state
+      if (!renameSucceeded) {
+        throw error;
+      }
+
+      // Verification failed; re-throw
+      throw error;
+    }
   }
 }
 

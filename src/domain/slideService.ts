@@ -15,6 +15,7 @@ import type { ElementRecord, SlideRecord } from "./models.js";
 import { NotFoundError, ValidationError } from "./errors.js";
 import { getRegistryStore } from "../storage/registry.js";
 import { presentationStore } from "../storage/presentationStore.js";
+import { deckMutex } from "../storage/deckMutex.js";
 
 const now = () => new Date().toISOString();
 
@@ -31,6 +32,16 @@ export type SlideUpdateItem = {
 
 export class SlideService {
   async create(args: {
+    deckId: string;
+    slides: SlideCreateItem[];
+  }): Promise<{ created: Array<SlideRecord & { position: number }> }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._createWithLock(args);
+    });
+  }
+
+  private async _createWithLock(args: {
     deckId: string;
     slides: SlideCreateItem[];
   }): Promise<{ created: Array<SlideRecord & { position: number }> }> {
@@ -107,6 +118,16 @@ export class SlideService {
     deckId: string;
     updates: SlideUpdateItem[];
   }): Promise<{ updated: SlideRecord[] }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._updateWithLock(args);
+    });
+  }
+
+  private async _updateWithLock(args: {
+    deckId: string;
+    updates: SlideUpdateItem[];
+  }): Promise<{ updated: SlideRecord[] }> {
     if (!args.updates || args.updates.length === 0) {
       throw new ValidationError("At least one slide update must be provided");
     }
@@ -159,6 +180,16 @@ export class SlideService {
     deckId: string;
     slideIds: string[];
   }): Promise<{ deleted: SlideRecord[] }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._deleteWithLock(args);
+    });
+  }
+
+  private async _deleteWithLock(args: {
+    deckId: string;
+    slideIds: string[];
+  }): Promise<{ deleted: SlideRecord[] }> {
     if (!args.slideIds || args.slideIds.length === 0) {
       throw new ValidationError("At least one slide ID must be provided");
     }
@@ -208,6 +239,18 @@ export class SlideService {
   }
 
   async move(args: {
+    deckId: string;
+    slideOrder?: string[];
+    slideId?: string;
+    toPosition?: number;
+  }): Promise<{ slides: Array<SlideRecord & { position: number }> }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._moveWithLock(args);
+    });
+  }
+
+  private async _moveWithLock(args: {
     deckId: string;
     slideOrder?: string[];
     slideId?: string;
@@ -280,6 +323,17 @@ export class SlideService {
   }
 
   async duplicate(args: {
+    deckId: string;
+    slideId: string;
+    targetPosition?: number;
+  }): Promise<{ duplicated: SlideRecord & { position: number } }> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._duplicateWithLock(args);
+    });
+  }
+
+  private async _duplicateWithLock(args: {
     deckId: string;
     slideId: string;
     targetPosition?: number;

@@ -4,6 +4,7 @@ import { NotFoundError, ConflictError } from "./errors.js";
 import { validateDeckInvariants, type DiagnosticIssue } from "./invariants.js";
 import { getRegistryStore } from "../storage/registry.js";
 import { presentationStore } from "../storage/presentationStore.js";
+import { deckMutex } from "../storage/deckMutex.js";
 
 const now = () => new Date().toISOString();
 
@@ -47,6 +48,17 @@ export class DeckService {
   }
 
   async update(args: { deckId: string; title: string; expectedRevision?: number }): Promise<DeckRecord> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(args.deckId, async () => {
+      return await this._updateWithLock(args);
+    });
+  }
+
+  private async _updateWithLock(args: {
+    deckId: string;
+    title: string;
+    expectedRevision?: number;
+  }): Promise<DeckRecord> {
     const registryStore = getRegistryStore();
     const registry = await registryStore.read();
     const deck = registry.decks.find((d) => d.id === args.deckId);
@@ -67,6 +79,13 @@ export class DeckService {
   }
 
   async delete(deckId: string): Promise<DeckRecord> {
+    // Serialize all mutations per deck to prevent races
+    return await deckMutex.withLock(deckId, async () => {
+      return await this._deleteWithLock(deckId);
+    });
+  }
+
+  private async _deleteWithLock(deckId: string): Promise<DeckRecord> {
     const registryStore = getRegistryStore();
     const registry = await registryStore.read();
     const index = registry.decks.findIndex((d) => d.id === deckId);

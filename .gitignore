@@ -8,3 +8,5 @@ tmp_smoke_test/
 *.tmp
 *.log
 .DS_Store
+
+AGENTS.md

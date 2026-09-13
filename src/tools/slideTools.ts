@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod/v4";
 import { slideService } from "../domain/slideService.js";
+import { slideRenderService } from "../domain/slideRenderService.js";
 
 const json = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -50,6 +51,41 @@ export function registerSlideTools(server: McpServer): void {
       },
     },
     async ({ deckId, slideId }) => json({ slide: await slideService.read(deckId, slideId) })
+  );
+
+  server.registerTool(
+    "slide_render",
+    {
+      description: "Render a slide to a PNG image preview for visual feedback.",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        deckId: z.string().uuid().describe("Stable ID of the presentation deck"),
+        slideId: z.string().uuid().describe("Stable ID of the slide to render"),
+        width: z
+          .number()
+          .int()
+          .min(320)
+          .max(4096)
+          .optional()
+          .describe("Optional output width in pixels; defaults to 1280"),
+      },
+    },
+    async ({ deckId, slideId, width }) => {
+      const preview = await slideRenderService.render({ deckId, slideId, width });
+      return {
+        content: [
+          {
+            type: "image" as const,
+            data: preview.data,
+            mimeType: preview.mimeType,
+          },
+          {
+            type: "text" as const,
+            text: JSON.stringify({ deckId, slideId, width: preview.width }),
+          },
+        ],
+      };
+    }
   );
 
   server.registerTool(
