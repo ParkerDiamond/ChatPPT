@@ -46,7 +46,7 @@ When running via `npx` or published binary, ChatPPT can be configured to target 
     "chatppt": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@parkerdiamond/chatppt", "--workspace", "${workspaceFolder}"]
+      "args": ["-y", "@jparkerdiamond/chatppt", "--workspace", "${workspaceFolder}"]
     }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@parkerdiamond/chatppt",
+  "name": "@jparkerdiamond/chatppt",
   "version": "0.1.0",
   "description": "Model Context Protocol (MCP) server for programmatic PowerPoint creation and editing",
   "publisher": "JParkerDiamond",
@@ -9,10 +9,10 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ParkerDiamond/ChatPPT.git"
+    "url": "git+https://github.com/ParkerDiamond/ChatPPT.git"
   },
   "bin": {
-    "chatppt": "./dist/index.js"
+    "chatppt": "dist/index.js"
   },
   "files": [
     "dist",
