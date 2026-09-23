@@ -2,6 +2,13 @@
 
 All notable changes to ChatPPT will be documented in this file.
 
+## [0.1.4] - 2026-09-23
+
+### Security
+- Reject image paths that resolve outside the workspace, including symlink escapes.
+- Bound image file reads and element request payload sizes.
+- Upgrade Vitest to resolve the reported npm security advisory.
+
 ## [0.1.0] - 2026-09-07
 
 ### Added
