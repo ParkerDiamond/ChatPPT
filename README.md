@@ -164,3 +164,4 @@ Configure the npm package's trusted publisher with GitHub Actions, repository `P
 ## License
 
 [MIT](LICENSE)
+
