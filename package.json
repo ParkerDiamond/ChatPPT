@@ -1,6 +1,6 @@
 {
   "name": "@jparkerdiamond/chatppt",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Model Context Protocol (MCP) server for programmatic PowerPoint creation and editing",
   "publisher": "JParkerDiamond",
   "author": "J. Parker Diamond",
