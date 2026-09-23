@@ -17,40 +17,47 @@ export function registerElementTools(server: McpServer): void {
         elements: z
           .array(
             z.object({
-              clientId: z.string().optional().describe("Optional request-scoped client correlation ID"),
+              clientId: z.string().max(256).optional().describe("Optional request-scoped client correlation ID"),
               kind: z
                 .enum(["textbox", "shape", "line", "table", "chart", "image"])
                 .default("textbox")
                 .describe("Element kind"),
-              preset: z.string().optional().describe("Shape preset geometry (e.g. star5, roundRect, rightArrow)"),
+              preset: z.string().max(128).optional().describe("Shape preset geometry (e.g. star5, roundRect, rightArrow)"),
               x: z.number().default(1).describe("Left x-coordinate in inches"),
               y: z.number().default(1).describe("Top y-coordinate in inches"),
               w: z.number().default(4).describe("Width in inches"),
               h: z.number().default(2).describe("Height in inches"),
-              text: z.string().optional().describe("Text content"),
-              fill: z.string().optional().describe("Solid fill color in hex format (e.g. #FF0000)"),
-              fontFamily: z.string().optional().describe("Font family name (e.g. Arial, Calibri)"),
+              text: z.string().max(10000).optional().describe("Text content"),
+              fill: z.string().max(64).optional().describe("Solid fill color in hex format (e.g. #FF0000)"),
+              fontFamily: z.string().max(128).optional().describe("Font family name (e.g. Arial, Calibri)"),
               fontSize: z.number().positive().optional().describe("Font size in points"),
               bold: z.boolean().optional().describe("Bold text flag"),
               italic: z.boolean().optional().describe("Italic text flag"),
-              textColor: z.string().optional().describe("Text color in hex format"),
-              strokeColor: z.string().optional().describe("Stroke border color in hex format"),
+              textColor: z.string().max(64).optional().describe("Text color in hex format"),
+              strokeColor: z.string().max(64).optional().describe("Stroke border color in hex format"),
               strokeWidth: z.number().nonnegative().optional().describe("Stroke border width in points"),
               align: z.enum(["left", "center", "right", "justify"]).optional().describe("Text alignment"),
-              rows: z.array(z.array(z.string())).optional().describe("2D array of string cells for tables"),
+              rows: z
+                .array(z.array(z.string().max(500)).max(25))
+                .max(25)
+                .optional()
+                .describe("2D array of string cells for tables"),
               chartSpec: z
                 .object({
                   kind: z.enum(["column", "bar", "line", "pie", "doughnut", "area"]),
-                  categories: z.array(z.string()),
-                  series: z.array(z.object({ name: z.string(), values: z.array(z.number()) })),
-                  title: z.string().optional(),
+                  categories: z.array(z.string().max(128)).max(1000),
+                  series: z
+                    .array(z.object({ name: z.string().max(256), values: z.array(z.number()).max(1000) }))
+                    .max(20),
+                  title: z.string().max(500).optional(),
                 })
                 .optional()
                 .describe("Chart specification"),
-              imagePath: z.string().optional().describe("Path to image file relative to workspace root"),
+              imagePath: z.string().max(4096).optional().describe("Path to image file relative to workspace root"),
             })
           )
           .min(1)
+          .max(25)
           .describe("Array of element definitions to create in batch"),
       },
     },
@@ -100,19 +107,20 @@ export function registerElementTools(server: McpServer): void {
               y: z.number().optional().describe("New top y-coordinate in inches"),
               w: z.number().optional().describe("New width in inches"),
               h: z.number().optional().describe("New height in inches"),
-              text: z.string().optional().describe("New text content"),
-              fill: z.string().optional().describe("New fill color in hex format"),
-              fontFamily: z.string().optional().describe("Font family name"),
+              text: z.string().max(10000).optional().describe("New text content"),
+              fill: z.string().max(64).optional().describe("New fill color in hex format"),
+              fontFamily: z.string().max(128).optional().describe("Font family name"),
               fontSize: z.number().positive().optional().describe("Font size in points"),
               bold: z.boolean().optional().describe("Bold text flag"),
               italic: z.boolean().optional().describe("Italic text flag"),
-              textColor: z.string().optional().describe("Text color in hex format"),
-              strokeColor: z.string().optional().describe("Stroke border color in hex format"),
+              textColor: z.string().max(64).optional().describe("Text color in hex format"),
+              strokeColor: z.string().max(64).optional().describe("Stroke border color in hex format"),
               strokeWidth: z.number().nonnegative().optional().describe("Stroke border width in points"),
               align: z.enum(["left", "center", "right", "justify"]).optional().describe("Text alignment"),
             })
           )
           .min(1)
+          .max(100)
           .describe("Array of element updates"),
       },
     },
@@ -127,7 +135,7 @@ export function registerElementTools(server: McpServer): void {
       inputSchema: {
         deckId: z.string().uuid().describe("Stable ID of the presentation deck"),
         slideId: z.string().uuid().describe("Stable ID of the slide"),
-        elementIds: z.array(z.string().uuid()).min(1).describe("Array of element IDs to delete"),
+        elementIds: z.array(z.string().uuid()).min(1).max(100).describe("Array of element IDs to delete"),
       },
     },
     async ({ deckId, slideId, elementIds }) =>

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import "./testHelper.js";
+import { truncate, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { testWorkspaceDir } from "./testHelper.js";
 import { deckService } from "../src/domain/deckService.js";
 import { slideService } from "../src/domain/slideService.js";
-import { elementService } from "../src/domain/elementService.js";
+import { elementService, MAX_IMAGE_BYTES } from "../src/domain/elementService.js";
 import { ValidationError } from "../src/domain/errors.js";
+import { resetWorkspaceRoot, setWorkspaceRoot } from "../src/storage/registry.js";
 
 describe("ElementService", () => {
   it("should create elements in batch with clientId correlation", async () => {
@@ -79,6 +82,28 @@ describe("ElementService", () => {
         ],
       })
     ).rejects.toThrow(ValidationError);
+  });
+
+  it("should reject image files larger than the configured limit", async () => {
+    setWorkspaceRoot(testWorkspaceDir);
+    const imagePath = join(testWorkspaceDir, "oversized.png");
+    await writeFile(imagePath, "");
+    await truncate(imagePath, MAX_IMAGE_BYTES + 1);
+
+    try {
+      const deck = await deckService.create({ title: "Deck" });
+      const slideRes = await slideService.create({ deckId: deck.id, slides: [{ title: "Slide 1" }] });
+
+      await expect(
+        elementService.create({
+          deckId: deck.id,
+          slideId: slideRes.created[0]!.id,
+          elements: [{ kind: "image", imagePath }],
+        })
+      ).rejects.toThrow(ValidationError);
+    } finally {
+      resetWorkspaceRoot();
+    }
   });
 
   it("should update elements in batch", async () => {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import "./testHelper.js";
-import { ensureSubpath, isSubpath, parseWorkspaceArgFromArgs } from "../src/storage/registry.js";
+import { ensureRealSubpath, ensureSubpath, isSubpath, parseWorkspaceArgFromArgs } from "../src/storage/registry.js";
 import { presentationStore } from "../src/storage/presentationStore.js";
 import { ValidationError } from "../src/domain/errors.js";
 
@@ -26,6 +29,23 @@ describe("Workspace Semantics & Path Isolation", () => {
     const parent = "/home/user/workspace";
     expect(() => ensureSubpath(parent, "/etc/passwd", "Path")).toThrow(ValidationError);
     expect(() => ensureSubpath(parent, "/home/user/workspace_other/file", "Path")).toThrow(ValidationError);
+  });
+
+  it("should reject symlinks that resolve outside the workspace", async () => {
+    const temporaryRoot = await mkdtemp(join(tmpdir(), "chatppt-path-test-"));
+    const workspace = join(temporaryRoot, "workspace");
+    const externalFile = join(temporaryRoot, "outside.png");
+    const workspaceLink = join(workspace, "image.png");
+
+    try {
+      await import("node:fs/promises").then(({ mkdir }) => mkdir(workspace));
+      await writeFile(externalFile, "outside");
+      await symlink(externalFile, workspaceLink);
+
+      await expect(ensureRealSubpath(workspace, workspaceLink, "Image path")).rejects.toThrow(ValidationError);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
   });
 
   it("should reject malformed deck IDs in presentationStore", () => {

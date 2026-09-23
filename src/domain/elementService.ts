@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { open } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import {
   addSlideChart,
@@ -28,11 +28,45 @@ import {
 import type { ChartSpec, ElementKind, ElementRecord } from "./models.js";
 import { NotFoundError, ValidationError } from "./errors.js";
 import { validateGeometry } from "./invariants.js";
-import { ensureSubpath, getRegistryStore, getWorkspaceRoot } from "../storage/registry.js";
+import { ensureRealSubpath, getRegistryStore, getWorkspaceRoot } from "../storage/registry.js";
 import { presentationStore } from "../storage/presentationStore.js";
 import { deckMutex } from "../storage/deckMutex.js";
 
 const now = () => new Date().toISOString();
+export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const MAX_REQUEST_IMAGE_BYTES = 50 * 1024 * 1024;
+
+async function readBoundedImage(path: string, byteLimit: number): Promise<Buffer> {
+  if (byteLimit <= 0) {
+    throw new ValidationError("Image files exceed the per-request size limit");
+  }
+
+  const imageFile = await open(path, "r");
+  try {
+    const { size } = await imageFile.stat();
+    if (size > byteLimit) {
+      throw new ValidationError(`Image file exceeds the ${byteLimit} byte limit`);
+    }
+
+    const chunks: Buffer[] = [];
+    const readBuffer = Buffer.allocUnsafe(64 * 1024);
+    let totalBytes = 0;
+
+    while (true) {
+      const { bytesRead } = await imageFile.read(readBuffer, 0, readBuffer.length, null);
+      if (bytesRead === 0) break;
+      totalBytes += bytesRead;
+      if (totalBytes > byteLimit) {
+        throw new ValidationError(`Image file exceeds the ${byteLimit} byte limit`);
+      }
+      chunks.push(Buffer.from(readBuffer.subarray(0, bytesRead)));
+    }
+
+    return Buffer.concat(chunks, totalBytes);
+  } finally {
+    await imageFile.close();
+  }
+}
 
 export type ElementCreateParams = {
   clientId?: string;
@@ -121,6 +155,7 @@ export class ElementService {
     if (!pptSlide) throw new Error("CONFLICT: presentation slide order differs from the registry");
 
     const created: Array<{ clientId?: string; element: ElementRecord }> = [];
+    let totalImageBytes = 0;
 
     for (const item of args.elements) {
       const kind: ElementKind = item.kind ?? "textbox";
@@ -182,9 +217,11 @@ export class ElementService {
           ? item.imagePath
           : resolve(workspaceRoot, item.imagePath);
 
-        const resolvedPath = ensureSubpath(workspaceRoot, rawResolved, "Image path");
+        const resolvedPath = await ensureRealSubpath(workspaceRoot, rawResolved, "Image path");
 
-        const imageBytes = await readFile(resolvedPath);
+        const imageLimit = Math.min(MAX_IMAGE_BYTES, MAX_REQUEST_IMAGE_BYTES - totalImageBytes);
+        const imageBytes = await readBoundedImage(resolvedPath, imageLimit);
+        totalImageBytes += imageBytes.length;
         pptShape = addSlideImage(pptSlide, imageBytes, {
           x: inches(x),
           y: inches(y),

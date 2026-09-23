@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile, rm, stat } from "node:fs/promises";
+import { mkdir, readFile, realpath, rename, writeFile, rm, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import type { Registry } from "../domain/models.js";
@@ -165,6 +165,14 @@ export function ensureSubpath(parentDir: string, targetPath: string, label: stri
     throw new ValidationError(`Security violation: ${label} '${targetPath}' escapes the managed workspace`);
   }
   return resolvedTarget;
+}
+
+export async function ensureRealSubpath(parentDir: string, targetPath: string, label: string): Promise<string> {
+  const [realParent, realTarget] = await Promise.all([realpath(parentDir), realpath(targetPath)]);
+  if (!isSubpath(realParent, realTarget)) {
+    throw new ValidationError(`Security violation: ${label} '${targetPath}' escapes the managed workspace`);
+  }
+  return realTarget;
 }
 
 export function getRegistryStore(): RegistryStore {
