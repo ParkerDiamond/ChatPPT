@@ -153,6 +153,14 @@ npm run dev
 
 ---
 
+## npm Trusted Publishing
+
+The `publish.yml` GitHub Actions workflow stages a package when a matching `v*` tag is pushed. The package must already exist on npm. The workflow uses GitHub OIDC through npm trusted publishing and does not require an npm token. A staged package is not public until a maintainer reviews and approves it with 2FA on npm.
+
+Configure the npm package's trusted publisher with GitHub Actions, repository `ParkerDiamond/ChatPPT`, workflow filename `publish.yml`, and the `npm stage publish` action enabled. The staging job uses Node.js 24 and npm 11.15.0 or later.
+
+---
+
 ## License
 
 [MIT](LICENSE)
