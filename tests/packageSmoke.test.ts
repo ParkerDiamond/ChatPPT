@@ -159,11 +159,15 @@ describe("Package Smoke Test (Built Tarball Artifact)", () => {
     // 4. Render the slide and verify the MCP image content block.
     const renderRes = (await client.callTool({
       name: "slide_render",
-      arguments: { deckId, slideId, width: 640 },
-    })) as { content: Array<{ type: string; data?: string; mimeType?: string }> };
+      arguments: { deckId, slideId, resolution: 640, filePath: "render-preview.jpg" },
+    })) as { content: Array<{ type: string; data?: string; mimeType?: string; text?: string }> };
     expect(renderRes.content[0]!.type).toBe("image");
     expect(renderRes.content[0]!.mimeType).toBe("image/png");
     expect(renderRes.content[0]!.data).toBeTruthy();
+    expect(JSON.parse(renderRes.content[1]!.text!).filePath).toBe(join(workspaceDir, "render-preview.png"));
+    expect((await readFile(join(workspaceDir, "render-preview.png"))).subarray(0, 8)).toEqual(
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+    );
 
     // 5. Validate deck
     const validateRes = (await client.callTool({

@@ -67,11 +67,23 @@ export function registerSlideTools(server: McpServer): void {
           .min(320)
           .max(4096)
           .optional()
+          .describe("Legacy output width in pixels; resolution takes precedence"),
+        resolution: z
+          .number()
+          .int()
+          .min(320)
+          .max(4096)
+          .optional()
           .describe("Optional output width in pixels; defaults to 1280"),
+        filePath: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Optional PNG output path inside the managed workspace; .png is added or substituted"),
       },
     },
-    async ({ deckId, slideId, width }) => {
-      const preview = await slideRenderService.render({ deckId, slideId, width });
+    async ({ deckId, slideId, width, resolution, filePath }) => {
+      const preview = await slideRenderService.render({ deckId, slideId, width, resolution, filePath });
       return {
         content: [
           {
@@ -81,7 +93,7 @@ export function registerSlideTools(server: McpServer): void {
           },
           {
             type: "text" as const,
-            text: JSON.stringify({ deckId, slideId, width: preview.width }),
+            text: JSON.stringify({ deckId, slideId, width: preview.width, filePath: preview.filePath }),
           },
         ],
       };
