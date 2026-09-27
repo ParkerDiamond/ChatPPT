@@ -82,6 +82,7 @@ ChatPPT operates on a deterministic workspace root resolved in the following pri
 
 ### Deck Management (`deck_*`)
 - `deck_create`: Create a new blank presentation deck.
+- `deck_import`: Import an existing PowerPoint file into the managed workspace and register its slides.
 - `deck_list`: List all managed decks in the workspace.
 - `deck_read`: Read metadata and slide/collection list for a deck.
 - `deck_update`: Update deck metadata (title) with optional optimistic revision check (`expectedRevision`).

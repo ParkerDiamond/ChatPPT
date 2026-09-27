@@ -76,6 +76,7 @@ describe("Package Smoke Test (Built Tarball Artifact)", () => {
     const toolNames = tools.tools.map((t) => t.name);
 
     expect(toolNames).toContain("deck_create");
+    expect(toolNames).toContain("deck_import");
     expect(toolNames).toContain("deck_list");
     expect(toolNames).toContain("deck_read");
     expect(toolNames).toContain("deck_update");

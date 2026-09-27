@@ -8,6 +8,17 @@ const json = (value: unknown) => ({
 
 export function registerDeckTools(server: McpServer): void {
   server.registerTool(
+    "deck_import",
+    {
+      description: "Import an existing PowerPoint deck into the managed workspace and initialize its registry metadata.",
+      inputSchema: {
+        filePath: z.string().min(1).describe("Path to an existing PowerPoint presentation file"),
+      },
+    },
+    async ({ filePath }) => json({ deck: await deckService.import({ filePath }) })
+  );
+
+  server.registerTool(
     "deck_create",
     {
       description: "Create a new blank PowerPoint presentation deck and initialize its metadata in the managed workspace.",

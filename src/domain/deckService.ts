@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { basename, extname } from "node:path";
+import { getSlideNotes, getSlideTitle, getSlides } from "@office-kit/pptx";
 import type { DeckRecord } from "./models.js";
 import { NotFoundError, ConflictError } from "./errors.js";
 import { validateDeckInvariants, type DiagnosticIssue } from "./invariants.js";
@@ -9,6 +11,40 @@ import { deckMutex } from "../storage/deckMutex.js";
 const now = () => new Date().toISOString();
 
 export class DeckService {
+  async import(args: { filePath: string }): Promise<DeckRecord> {
+    const registryStore = getRegistryStore();
+    const registry = await registryStore.read();
+    const id = randomUUID();
+    const importedAt = now();
+    const presentation = await presentationStore.importFromFile(id, args.filePath);
+    const fileTitle = basename(args.filePath, extname(args.filePath));
+    const deck: DeckRecord = {
+      id,
+      title: fileTitle || undefined,
+      fileName: `${id}.pptx`,
+      revision: 1,
+      slides: getSlides(presentation).map((slide) => ({
+        id: randomUUID(),
+        title: getSlideTitle(slide) || undefined,
+        notes: getSlideNotes(slide) || undefined,
+        elements: [],
+      })),
+      collections: [],
+      createdAt: importedAt,
+      updatedAt: importedAt,
+    };
+
+    registry.decks.push(deck);
+    try {
+      await registryStore.write(registry);
+    } catch (error) {
+      await presentationStore.delete(id);
+      throw error;
+    }
+
+    return deck;
+  }
+
   async create(args: { title?: string }): Promise<DeckRecord> {
     const registryStore = getRegistryStore();
     const registry = await registryStore.read();

@@ -54,6 +54,12 @@ export class PresentationStore {
     return await loadPresentationFile(path);
   }
 
+  async importFromFile(deckId: string, sourcePath: string): Promise<PresentationData> {
+    const presentation = await loadPresentationFile(resolve(sourcePath));
+    await this.save(deckId, presentation);
+    return presentation;
+  }
+
   /**
    * Atomically save a presentation with crash-safe semantics.
    * 

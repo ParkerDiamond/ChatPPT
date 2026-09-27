@@ -1,9 +1,33 @@
 import { describe, expect, it } from "vitest";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { addBlankSlide, createPresentation, getSlides, setSlideNotes } from "@office-kit/pptx";
+import { savePresentationToFile } from "@office-kit/pptx/node";
 import "./testHelper.js";
 import { deckService } from "../src/domain/deckService.js";
 import { ConflictError, NotFoundError } from "../src/domain/errors.js";
+import { presentationStore } from "../src/storage/presentationStore.js";
+import { testWorkspaceDir } from "./testHelper.js";
 
 describe("DeckService", () => {
+  it("should import a presentation and register its slides", async () => {
+    const sourcePath = join(testWorkspaceDir, "Quarterly Review.pptx");
+    const presentation = createPresentation();
+    const slide = addBlankSlide(presentation);
+    setSlideNotes(slide, "Discuss the quarterly trend");
+    await mkdir(testWorkspaceDir, { recursive: true });
+    await savePresentationToFile(presentation, sourcePath);
+
+    const deck = await deckService.import({ filePath: sourcePath });
+
+    expect(deck.title).toBe("Quarterly Review");
+    expect(deck.slides).toHaveLength(1);
+    expect(deck.slides[0]).toMatchObject({ notes: "Discuss the quarterly trend" });
+    const managedPresentation = await presentationStore.load(deck.id);
+    expect(getSlides(managedPresentation)).toHaveLength(1);
+    expect((await deckService.list()).map(({ id }) => id)).toContain(deck.id);
+  });
+
   it("should create, list, and read a new deck", async () => {
     const deck = await deckService.create({ title: "My Sales Pitch" });
     expect(deck.id).toBeDefined();
