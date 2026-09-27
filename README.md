@@ -52,6 +52,10 @@ When running via `npx` or published binary, ChatPPT can be configured to target 
 }
 ```
 
+### Bundled Agent Skill
+
+The npm package includes the portable `create-deck-skeleton` Agent Skill at `skills/create-deck-skeleton/SKILL.md`. MCP clients do not automatically load agent skills when connecting to a server. To use the skill, install or copy that directory into the skill-discovery location supported by your agent host, such as `.github/skills/`, `.agents/skills/`, or `.claude/skills/`. The skill uses ChatPPT's MCP tools and does not depend on a particular operating system or editor.
+
 ---
 
 ## Workspace Behavior & Security Boundaries
