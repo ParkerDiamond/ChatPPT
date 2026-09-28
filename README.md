@@ -164,6 +164,10 @@ The `publish.yml` GitHub Actions workflow stages a package when a matching `v*` 
 
 Configure the npm package's trusted publisher with GitHub Actions, repository `ParkerDiamond/ChatPPT`, workflow filename `publish.yml`, and the `npm stage publish` action enabled. The staging job uses Node.js 24 and npm 11.15.0 or later.
 
+## MCP Registry Publishing
+
+The same `publish.yml` workflow publishes `server.json` to the MCP Registry when a `v*` version tag is pushed. It authenticates with GitHub OIDC and does not require a registry secret. The registry job waits for npm staging, but MCP Registry validation requires the referenced npm version to be publicly available. If npm approval is still pending when the workflow runs, approve the staged npm release and rerun the failed registry job.
+
 ---
 
 ## License
